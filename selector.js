@@ -92,12 +92,15 @@ class Selector {
     // Speeds
     this.speedX = 0;
     this.speedY = 0;
+    this.prevPos = 0;
+    this.stoppedSpeed = false;
 
     // Test
     this.dx = 0;
     this.dy = 0;
     this.dWidth = 0;
     this.dHeight = 0;
+    this.stopResizing = [];
 
     // Event listeners
     window.addEventListener("resize", this.resize);
@@ -226,6 +229,9 @@ class Selector {
       return;
     }
 
+    if (this.prevPos === this.x) this.stoppedSpeed = true;
+    else this.stoppedSpeed = false;
+
     const is = (side) => this.selectedResizer?.includes(side);
     if (this.ratio) {
       if (is("l") || is("tl") || is("bl")) this.speedX = this.speedY = sx;
@@ -240,6 +246,8 @@ class Selector {
     }
     if (!is("l") && !is("r")) this.speedX = 0;
     if (!is("t") && !is("b")) this.speedY = 0;
+
+    this.prevPos = this.x;
   }
 
   selector() {
@@ -340,6 +348,10 @@ class Selector {
     // Left
     if (this.x < 0) {
       this.x = 0;
+      !this.stopResizing.includes("l") && this.stopResizing.push("l");
+    } else if (this.stopResizing.includes("l")) {
+      const index = this.stopResizing.indexOf("l");
+      if (index > -1) this.stopResizing.splice(index, 1);
     }
 
     // Right
@@ -348,11 +360,16 @@ class Selector {
       this.width++;
       dHeight = this.getHeight(1, this.ratio);
       if (this.selectedResizer === "ct") dy = -dHeight;
+      this.stopResizing = "r";
     }
 
     // Top
     if (this.y < 0) {
       this.y = 0;
+      !this.stopResizing.includes("t") && this.stopResizing.push("t");
+    } else if (this.stopResizing.includes("t")) {
+      const index = this.stopResizing.indexOf("t");
+      if (index > -1) this.stopResizing.splice(index, 1);
     }
 
     // Bottom
@@ -361,11 +378,12 @@ class Selector {
       this.height++;
       dWidth = this.getWidth(1, this.ratio);
       if (this.selectedResizer === "cl") dx = -dWidth;
+      this.stopResizing = "b";
     }
 
     // Top & Bottom
     if (this.height > this.canvas.height) {
-      console.log("TB");
+      this.stopResizing = "t";
       this.y = 0;
       this.height = this.canvas.height;
       this.width = this.getWidth(this.height, this.ratio);
@@ -398,6 +416,52 @@ class Selector {
     this.y += dy;
     this.width += dWidth;
     this.height += dHeight;
+  }
+
+  preventOverflow2() {
+    // this.setSpeeds();
+    // When moving the resizer rectangle
+    // if (!this.selectedResizer && !this.drawing && !this.isUpdatingRatio) {
+    //   this.preventMoveOverflow();
+    //   return;
+    // }
+
+    // // Normal overflow check using mouse position
+    // const x = this.position.x;
+    // if (x < 0) {
+    //   this.position.x = 0;
+    // } else if (x > this.canvas.width) {
+    //   this.position.x = this.canvas.width;
+    // }
+
+    // if (this.position.y < 0) {
+    //   this.position.y = 0;
+    // } else if (this.position.y > this.canvas.height) {
+    //   this.position.y = this.canvas.height;
+    // }
+
+    if (this.x + this.dx < 0) {
+      this.dx = this.x = 0;
+      this.dHeight = this.dWidth = this.dy = this.dx = 0;
+    }
+
+    console.log(this.stoppedSpeed);
+    if (this.y + this.height + this.dHeight > this.canvas.height) {
+      this.height = this.canvas.height - this.y;
+      this.dHeight = this.dWidth = this.dy = this.dx = 0;
+    } else if (this.y + this.dy < 0) {
+      this.dy = this.y = 0;
+      this.dHeight = this.dWidth = this.dy = this.dx = 0;
+      this.position.x = this.x;
+    } else if (this.y + this.dy > this.canvas.height) {
+      this.y = this.canvas.height;
+      this.dHeight = this.dWidth = this.dy = this.dx = 0;
+    }
+
+    this.x += this.dx;
+    this.y += this.dy;
+    this.width += this.dWidth;
+    this.height += this.dHeight;
   }
 
   // Draw the resizer
@@ -464,7 +528,6 @@ class Selector {
   // Resize
   resizeHandler() {
     this.setSpeeds();
-
     switch (this.selectedResizer) {
       // Corners
       case "tl":
@@ -518,18 +581,20 @@ class Selector {
         break;
     }
 
-    this.x += this.dx;
-    this.y += this.dy;
-    this.width += this.dWidth;
-    this.height += this.dHeight;
+    this.preventOverflow2();
+    // this.x += this.dx;
+    // this.y += this.dy;
+    // this.width += this.dWidth;
+    // this.height += this.dHeight;
   }
 
   update(isUpdatingRatio) {
     this.c.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    this.preventOverflow();
+    // this.preventOverflow2();
     // Resize the selector
-    if (this.selectedResizer && !this.ratio) {
+    // if (this.selectedResizer && !this.ratio) {
+    if (this.selectedResizer) {
       this.resizeHandler();
     } else if (this.drawing) {
       this.drawHandler();
